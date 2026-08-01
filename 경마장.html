@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>더비 클럽 — 3D 경마 게임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg: #101d16;
+    --panel: #17271d;
+    --panel-2: #1f3326;
+    --gold: #d4a72c;
+    --gold-bright: #f0c85a;
+    --cream: #ede6d6;
+    --muted: #8fa290;
+    --c1: #c1392b;
+    --c2: #2456a6;
+    --c3: #3f8f5f;
+    --c4: #7a4fa3;
+    --c5: #d97b29;
+    --c6: #d4c72c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at 50% -10%, #1c3324 0%, var(--bg) 55%);
+    color:var(--cream);
+    font-family:'Noto Sans KR',sans-serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{ width:100%; max-width:920px; }
+
+  .mode-screen{
+    position:fixed;
+    inset:0;
+    z-index:10;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    background:
+      radial-gradient(ellipse at 50% -12%, rgba(58,107,63,0.42), rgba(16,29,22,0.96) 56%),
+      linear-gradient(180deg, rgba(12,22,16,0.9), rgba(12,22,16,0.98));
+    transition:opacity .22s ease, visibility .22s ease;
+  }
+  .mode-screen.is-hidden{
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+  }
+  .mode-window{
+    width:min(100%, 760px);
+    border:6px solid #3a2c1c;
+    border-radius:10px;
+    background:linear-gradient(180deg, #17271d, #101d16);
+    box-shadow:0 28px 90px rgba(0,0,0,0.45), inset 0 0 36px rgba(0,0,0,0.3);
+    padding:28px;
+  }
+  .mode-head{ text-align:center; margin-bottom:22px; }
+  .mode-title{
+    font-family:'Anton',sans-serif;
+    font-size:clamp(34px,6vw,54px);
+    letter-spacing:2px;
+    margin:4px 0 0;
+    color:var(--cream);
+    text-shadow:0 0 24px rgba(212,167,44,0.24);
+  }
+  .mode-title span{ color:var(--gold-bright); }
+  .mode-options{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:12px;
+  }
+  .mode-card{
+    width:100%;
+    min-height:170px;
+    padding:18px;
+    border:1.5px solid #2c4433;
+    border-radius:8px;
+    background:var(--panel-2);
+    color:var(--cream);
+    text-align:left;
+    cursor:pointer;
+    transition:border-color .15s, transform .15s, background .15s, box-shadow .15s;
+  }
+  .mode-card:hover{ transform:translateY(-2px); background:#243a2c; }
+  .mode-card.selected{
+    border-color:var(--gold-bright);
+    background:#2a3f2a;
+    box-shadow:0 0 0 1px var(--gold-bright) inset, 0 0 16px rgba(240,200,90,0.18);
+  }
+  .mode-card .mode-name{
+    font-family:'Anton',sans-serif;
+    font-size:24px;
+    letter-spacing:1px;
+    color:var(--gold-bright);
+  }
+  .mode-card .mode-tag{
+    display:inline-block;
+    margin-top:8px;
+    padding:4px 8px;
+    border:1px solid rgba(212,167,44,0.38);
+    border-radius:6px;
+    font-family:'Space Mono',monospace;
+    font-size:10px;
+    letter-spacing:1.4px;
+    color:var(--muted);
+  }
+  .mode-card .mode-copy{
+    margin:14px 0 0;
+    font-size:13px;
+    line-height:1.55;
+    color:var(--muted);
+  }
+  .mode-actions{
+    display:flex;
+    justify-content:center;
+    margin-top:22px;
+  }
+  .mode-start-btn{ min-width:190px; }
+
+  body.mode-normal .loan-chip,
+  body.mode-normal #loanPanel{
+    display:none;
+  }
+
+  .top-actions{
+    display:flex;
+    justify-content:center;
+    margin:14px 0 0;
+  }
+  .home-btn{
+    padding:8px 18px;
+    font-size:14px;
+  }
+
+  @media (max-width:680px){
+    .mode-window{ padding:22px; }
+    .mode-options{ grid-template-columns:1fr; }
+  }
+
+  header{ text-align:center; margin-bottom:22px; }
+  .kicker{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    letter-spacing:4px;
+    color:var(--gold);
+    text-transform:uppercase;
+  }
+  h1{
+    font-family:'Anton',sans-serif;
+    font-size:clamp(36px,7vw,58px);
+    letter-spacing:2px;
+    margin:4px 0 0;
+    color:var(--rail);
+    text-shadow: 0 0 24px rgba(212,167,44,0.25);
+  }
+  h1 span{ color:var(--gold-bright); }
+
+  .toteboard{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:18px 0 28px;
+    flex-wrap:wrap;
+  }
+  .tote-chip{
+    background:#0c1610;
+    border:1px solid #2c4433;
+    border-radius:10px;
+    padding:8px 18px;
+    font-family:'Space Mono',monospace;
+    text-align:center;
+    min-width:110px;
+  }
+  .tote-chip .label{ font-size:10px; color:var(--muted); letter-spacing:2px; }
+  .tote-chip .value{ font-size:20px; color:var(--gold-bright); font-weight:700; }
+  .tote-chip.loan-chip .value{ color:#e0776a; }
+  .tote-chip.loan-chip.has-debt{ border-color:#7a3b32; }
+
+  .scene-frame{
+    position:relative;
+    border:6px solid #3a2c1c;
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.45);
+    background:#8fc7e8;
+  }
+  #scene3d{ display:block; width:100%; height:380px; }
+  #scene3d canvas{ display:block; width:100%; height:100%; }
+
+  .commentary-bar{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    padding:8px 14px;
+    background:linear-gradient(0deg, rgba(10,15,10,0.88), rgba(10,15,10,0));
+    font-family:'Space Mono',monospace;
+    font-size:12.5px;
+    color:var(--gold-bright);
+    min-height:22px;
+    letter-spacing:0.2px;
+  }
+
+  .leaderboard{
+    position:absolute;
+    top:10px; right:10px;
+    background:rgba(10,18,12,0.72);
+    border:1px solid rgba(212,167,44,0.35);
+    border-radius:8px;
+    padding:8px 10px;
+    font-family:'Space Mono',monospace;
+    font-size:11.5px;
+    min-width:118px;
+  }
+  .leaderboard .lb-title{
+    color:var(--muted); letter-spacing:2px; font-size:9.5px; margin-bottom:5px;
+  }
+  .lb-row{
+    display:flex; align-items:center; gap:6px;
+    padding:2px 0;
+    color:var(--cream);
+  }
+  .lb-row.me{ color:var(--gold-bright); font-weight:700; }
+  .lb-dot{ width:8px;height:8px;border-radius:50%; flex-shrink:0; }
+  .lb-rank{ width:14px; color:var(--muted); }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid #2c4433;
+    border-radius:14px;
+    margin-top:22px;
+    padding:20px;
+  }
+  .panel h2{
+    font-family:'Anton', sans-serif;
+    font-size:20px;
+    letter-spacing:1px;
+    margin:0 0 14px;
+    color:var(--gold-bright);
+  }
+  .horse-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px,1fr));
+    gap:10px;
+  }
+  .horse-card{
+    background:var(--panel-2);
+    border:1.5px solid transparent;
+    border-radius:12px;
+    padding:14px;
+    cursor:pointer;
+    transition: border-color .15s, transform .15s, background .15s;
+  }
+  .horse-card:hover{ transform:translateY(-2px); background:#243a2c; }
+  .horse-card.selected{
+    border-color:var(--gold-bright);
+    background:#2a3f2a;
+    box-shadow: 0 0 0 1px var(--gold-bright) inset, 0 0 16px rgba(240,200,90,0.18);
+  }
+  .horse-card .top{
+    display:flex; align-items:center; gap:9px;
+  }
+  .silk-dot{
+    width:16px;height:16px;border-radius:50%;flex-shrink:0;
+    box-shadow: 0 0 0 2px rgba(237,230,214,0.4);
+  }
+  .horse-card .name{ font-weight:700; font-size:14.5px; }
+  .horse-card .pick-tag{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    color:var(--gold-bright);
+    margin-top:6px;
+    letter-spacing:1px;
+    visibility:hidden;
+  }
+  .horse-card.selected .pick-tag{ visibility:visible; }
+
+  .bet-row{
+    display:flex; align-items:center; gap:12px;
+    margin-top:16px; flex-wrap:wrap;
+  }
+  .bet-row label{ font-size:13px; color:var(--muted); }
+  .bet-row input[type=range]{ width:180px; accent-color:var(--gold); }
+  .bet-row input[type=range]:disabled{
+    opacity:0.55;
+    cursor:not-allowed;
+  }
+  .bet-amount{
+    font-family:'Space Mono',monospace;
+    color:var(--gold-bright);
+    font-size:16px;
+    min-width:80px;
+  }
+
+  .btn{
+    font-family:'Anton',sans-serif;
+    letter-spacing:1px;
+    font-size:17px;
+    padding:12px 28px;
+    border-radius:8px;
+    border:none;
+    cursor:pointer;
+    background: linear-gradient(180deg,var(--gold-bright),var(--gold));
+    color:#1a1206;
+    box-shadow: 0 4px 0 #8a6c1a;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #8a6c1a; }
+  .btn:disabled{
+    background:#3a4640; color:#6f8078; box-shadow:none; cursor:not-allowed;
+  }
+  .btn-secondary{
+    background: linear-gradient(180deg,#3a5a44,#2c4433);
+    color:var(--cream);
+    box-shadow: 0 4px 0 #1c2c1f;
+  }
+  .btn-secondary:active{ box-shadow:0 1px 0 #1c2c1f; }
+  .btn-loan{
+    background: linear-gradient(180deg,#c1392b,#8f2a1f);
+    color:var(--cream);
+    box-shadow: 0 4px 0 #5c1c14;
+  }
+  .btn-loan:active{ box-shadow:0 1px 0 #5c1c14; }
+  .btn-loan:disabled, .btn-secondary:disabled{
+    background:#3a4640; color:#6f8078; box-shadow:none; cursor:not-allowed;
+  }
+  .btn-row{ margin-top:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+
+  .msg{ font-size:13px; color:var(--muted); }
+  .loan-note{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+
+  .result-banner{
+    display:none;
+    margin-top:16px;
+    padding:16px;
+    border-radius:8px;
+    background:var(--panel-2);
+    border:1px solid var(--gold);
+    text-align:center;
+  }
+  .result-banner.show{ display:block; }
+  .result-banner .win{
+    font-family:'Anton',sans-serif;
+    font-size:24px;
+    color:var(--gold-bright);
+  }
+  .result-banner .detail{
+    font-family:'Space Mono',monospace;
+    font-size:13px;
+    color:var(--muted);
+    margin-top:6px;
+  }
+
+  .shark-modal{
+    display:none;
+    margin-top:16px;
+    padding:18px;
+    border-radius:8px;
+    background:linear-gradient(180deg, #2a1b17, #17271d);
+    border:1px solid #c1392b;
+    box-shadow:0 0 20px rgba(193,57,43,0.18);
+  }
+  .shark-modal.show{ display:block; }
+  .shark-modal h2{
+    font-family:'Anton',sans-serif;
+    font-size:24px;
+    letter-spacing:1px;
+    margin:0 0 8px;
+    color:#e0776a;
+  }
+  .shark-modal p{
+    margin:0;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.55;
+  }
+  .shark-numbers{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:14px;
+  }
+  .shark-chip{
+    min-width:130px;
+    padding:9px 12px;
+    border-radius:8px;
+    border:1px solid rgba(224,119,106,0.36);
+    background:rgba(12,22,16,0.72);
+    font-family:'Space Mono',monospace;
+  }
+  .shark-chip .label{
+    font-size:10px;
+    color:var(--muted);
+    letter-spacing:1.5px;
+  }
+  .shark-chip .value{
+    margin-top:2px;
+    color:#e0776a;
+    font-size:18px;
+    font-weight:700;
+  }
+  .shark-modal .btn-row{ margin-top:16px; }
+
+  footer{ text-align:center; margin-top:26px; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="mode-screen" id="modeScreen">
+  <div class="mode-window">
+    <div class="mode-head">
+      <div class="kicker">DERBY CLUB · MODE SELECT</div>
+      <div class="mode-title">레이스 <span>모드 선택</span></div>
+    </div>
+    <div class="mode-options" id="modeOptions" role="group" aria-label="게임 모드 선택">
+      <button class="mode-card selected" type="button" data-mode="normal" aria-pressed="true">
+        <div class="mode-name">일반 모드</div>
+        <div class="mode-tag">CLASSIC</div>
+        <p class="mode-copy">보유 코인 안에서만 베팅하며 깔끔하게 레이스를 이어갑니다.</p>
+      </button>
+      <button class="mode-card" type="button" data-mode="loan" aria-pressed="false">
+        <div class="mode-name">은행 대출 모드</div>
+        <div class="mode-tag">BANK LOAN</div>
+        <p class="mode-copy">레이스마다 최대 2000 코인까지 빌리고, 남은 대출금에 5% 이자가 붙습니다.</p>
+      </button>
+      <button class="mode-card" type="button" data-mode="shark" aria-pressed="false">
+        <div class="mode-name">고리대금 모드</div>
+        <div class="mode-tag">COLLECTOR</div>
+        <p class="mode-copy">5~15라운드 사이에 업자가 1~2번 찾아와 즉시 상환을 요구합니다.</p>
+      </button>
+    </div>
+    <div class="mode-actions">
+      <button class="btn mode-start-btn" id="modeStartBtn" type="button">시작하기</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">DERBY CLUB · SEASON 26 · 3D TRACK</div>
+    <h1>가상 <span>경마</span> 게임</h1>
+    <div class="top-actions">
+      <button class="btn btn-secondary home-btn" id="homeBtn" type="button">홈으로</button>
+    </div>
+  </header>
+
+  <div class="toteboard">
+    <div class="tote-chip"><div class="label">보유 코인</div><div class="value" id="balance">1000</div></div>
+    <div class="tote-chip"><div class="label">현재 베팅</div><div class="value" id="currentBet">-</div></div>
+    <div class="tote-chip loan-chip"><div class="label">대출금</div><div class="value" id="loanBalance">0</div></div>
+    <div class="tote-chip"><div class="label">레이스 회차</div><div class="value" id="raceNum">1</div></div>
+  </div>
+
+  <div class="scene-frame">
+    <div id="scene3d"></div>
+    <div class="leaderboard" id="leaderboard">
+      <div class="lb-title">LIVE RANKING</div>
+      <div id="lbRows"></div>
+    </div>
+    <div class="commentary-bar" id="commentaryBar">중계 준비 중...</div>
+  </div>
+
+  <div class="result-banner" id="resultBanner">
+    <div class="win" id="resultText"></div>
+    <div class="detail" id="resultDetail"></div>
+  </div>
+
+  <div class="shark-modal" id="sharkModal">
+    <h2>고리대금 업자 방문</h2>
+    <p id="sharkMessage">업자가 상환을 요구합니다.</p>
+    <div class="shark-numbers">
+      <div class="shark-chip"><div class="label">즉시 상환 요구액</div><div class="value" id="sharkDemand">0 코인</div></div>
+      <div class="shark-chip"><div class="label">못 갚을 때 부가 이자</div><div class="value" id="sharkPenalty">0 코인</div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="paySharkBtn" type="button">요구액 갚기</button>
+      <button class="btn btn-loan" id="missSharkBtn" type="button">못 갚음</button>
+      <span class="msg" id="sharkMsg"></span>
+    </div>
+  </div>
+
+  <div class="panel" id="betPanel">
+    <h2>말 선택 &amp; 베팅</h2>
+    <div class="horse-grid" id="horseGrid"></div>
+
+    <div class="bet-row">
+      <label for="betSlider">베팅 금액</label>
+      <input type="range" id="betSlider" min="10" max="1000" step="10" value="100">
+      <span class="bet-amount" id="betAmountLabel">100 코인</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="startBtn">경주 시작 🏁</button>
+      <span class="msg" id="statusMsg">말을 선택하고 베팅 금액을 정한 뒤 시작하세요.</span>
+    </div>
+  </div>
+
+  <div class="panel" id="loanPanel">
+    <h2>대출 관리</h2>
+    <div class="bet-row">
+      <label for="loanSlider">대출 / 상환 금액</label>
+      <input type="range" id="loanSlider" min="50" max="2000" step="50" value="200">
+      <span class="bet-amount" id="loanAmountLabel">200 코인</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-loan" id="loanBtn">대출받기 💰</button>
+      <button class="btn btn-secondary" id="repayBtn">상환하기</button>
+      <span class="msg" id="loanMsg"></span>
+    </div>
+    <div class="loan-note" id="loanNote">대출금이 있으면 경주를 한 판 할 때마다 남은 대출금에 5% 이자가 붙어요.</div>
+  </div>
+
+  <footer>가상 코인으로 즐기는 시뮬레이션 게임입니다. 실제 화폐가 사용되지 않습니다.</footer>
+</div>
+
+<script>
+/* ============ Game data ============ */
+const HORSE_DEFS = [
+  { name: "번개탄",     hex:0xc1392b },
+  { name: "황금발굽",   hex:0x2456a6 },
+  { name: "조랑말킹",   hex:0x3f8f5f },
+  { name: "태풍의눈",   hex:0x7a4fa3 },
+  { name: "무적명마",   hex:0xd97b29 },
+  { name: "새벽별",     hex:0xc9b93a },
+];
+const LANES = HORSE_DEFS.length;
+const PAYOUT_MULTIPLIER = 5;
+const LOAN_LIMIT = 2000;
+const LOAN_INTEREST_RATE = 0.05;
+
+let balance = 1000;
+let raceNum = 1;
+let selectedHorse = null;
+let betAmount = 100;
+let racing = false;
+let loanBalance = 0;
+let loanAmount = 200;
+let borrowedThisRace = 0;
+let gameMode = 'normal';
+let sharkVisitSchedule = [];
+let sharkEventActive = false;
+let sharkDemandAmount = 0;
+let sharkPenaltyAmount = 0;
+
+const modeScreen = document.getElementById('modeScreen');
+const modeOptions = document.getElementById('modeOptions');
+const modeStartBtn = document.getElementById('modeStartBtn');
+const homeBtn = document.getElementById('homeBtn');
+const gridEl = document.getElementById('horseGrid');
+const balanceEl = document.getElementById('balance');
+const currentBetEl = document.getElementById('currentBet');
+const raceNumEl = document.getElementById('raceNum');
+const startBtn = document.getElementById('startBtn');
+const statusMsg = document.getElementById('statusMsg');
+const betSlider = document.getElementById('betSlider');
+const betAmountLabel = document.getElementById('betAmountLabel');
+const resultBanner = document.getElementById('resultBanner');
+const resultText = document.getElementById('resultText');
+const resultDetail = document.getElementById('resultDetail');
+const loanBalanceEl = document.getElementById('loanBalance');
+const loanChipEl = document.querySelector('.loan-chip');
+const loanSlider = document.getElementById('loanSlider');
+const loanAmountLabel = document.getElementById('loanAmountLabel');
+const loanBtn = document.getElementById('loanBtn');
+const repayBtn = document.getElementById('repayBtn');
+const loanMsg = document.getElementById('loanMsg');
+const loanPanel = document.getElementById('loanPanel');
+const loanNote = document.getElementById('loanNote');
+const sharkModal = document.getElementById('sharkModal');
+const sharkMessage = document.getElementById('sharkMessage');
+const sharkDemandEl = document.getElementById('sharkDemand');
+const sharkPenaltyEl = document.getElementById('sharkPenalty');
+const paySharkBtn = document.getElementById('paySharkBtn');
+const missSharkBtn = document.getElementById('missSharkBtn');
+const sharkMsg = document.getElementById('sharkMsg');
+const commentaryBar = document.getElementById('commentaryBar');
+const lbRows = document.getElementById('lbRows');
+
+function renderHorseCards(){
+  gridEl.innerHTML = '';
+  HORSE_DEFS.forEach((def, i) => {
+    const card = document.createElement('div');
+    card.className = 'horse-card';
+    card.dataset.idx = i;
+    card.innerHTML = `
+      <div class="top">
+        <div class="silk-dot" style="background:#${def.hex.toString(16).padStart(6,'0')}"></div>
+        <div class="name">${i+1}. ${def.name}</div>
+      </div>
+      <div class="pick-tag">내 베팅 ✓</div>
+    `;
+    card.addEventListener('click', () => {
+      if(racing) return;
+      selectedHorse = i;
+      document.querySelectorAll('.horse-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      statusMsg.textContent = `${def.name}에게 ${betAmount} 코인을 베팅합니다.`;
+      updateBalanceUI();
+    });
+    gridEl.appendChild(card);
+  });
+}
+
+function updateBalanceUI(){
+  balanceEl.textContent = balance;
+  currentBetEl.textContent = selectedHorse !== null ? `${HORSE_DEFS[selectedHorse].name} · ${betAmount}` : '-';
+  raceNumEl.textContent = raceNum;
+  loanBalanceEl.textContent = loanBalance;
+  loanChipEl.classList.toggle('has-debt', loanBalance > 0);
+}
+
+function setBetControlsLocked(locked){
+  betSlider.disabled = locked;
+}
+
+function randomInt(min, max){
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomDebtPortion(){
+  return Math.max(10, Math.ceil((loanBalance * (0.2 + Math.random() * 0.3)) / 10) * 10);
+}
+
+function scheduleNextSharkCycle(){
+  const visitCount = randomInt(1, 2);
+  const visits = new Set();
+  while(visits.size < visitCount){
+    visits.add(raceNum + randomInt(5, 15));
+  }
+  sharkVisitSchedule = [...visits].sort((a, b) => a - b);
+}
+
+function setLoanControlsLocked(locked){
+  const loanModeActive = gameMode !== 'normal' && !sharkEventActive;
+  loanSlider.disabled = locked || !loanModeActive;
+  loanBtn.disabled = locked || !loanModeActive;
+  repayBtn.disabled = locked || !loanModeActive;
+}
+
+function applyGameMode(){
+  const normalMode = gameMode === 'normal';
+  document.body.classList.toggle('mode-normal', normalMode);
+  document.body.classList.toggle('mode-loan', gameMode === 'loan');
+  document.body.classList.toggle('mode-shark', gameMode === 'shark');
+  loanPanel.hidden = normalMode;
+  loanChipEl.hidden = normalMode;
+  sharkModal.classList.remove('show');
+  sharkEventActive = false;
+  loanBalance = 0;
+  borrowedThisRace = 0;
+  balance = 1000;
+  raceNum = 1;
+  selectedHorse = null;
+  betAmount = parseInt(betSlider.value, 10);
+  loanAmount = parseInt(loanSlider.value, 10);
+  sharkVisitSchedule = [];
+  if(gameMode === 'shark') scheduleNextSharkCycle();
+  loanMsg.textContent = normalMode
+    ? ''
+    : '이번 레이스에서 최대 2000 코인까지 대출할 수 있습니다.';
+  loanNote.textContent = gameMode === 'shark'
+    ? '레이스마다 2000 코인까지 대출할 수 있고, 5~15라운드 사이에 업자가 1~2번 찾아올 수 있어요.'
+    : '레이스마다 2000 코인까지 빌릴 수 있고, 경주를 한 판 할 때마다 남은 대출금에 5% 이자가 붙어요.';
+  setLoanControlsLocked(false);
+  newRaceSetup();
+  updateBalanceUI();
+}
+
+function resolveSharkVisit(paid){
+  if(!sharkEventActive) return;
+  if(paid){
+    const paidAmount = Math.min(sharkDemandAmount, balance, loanBalance);
+    balance -= paidAmount;
+    loanBalance -= paidAmount;
+    loanMsg.textContent = `업자에게 ${paidAmount} 코인을 갚았습니다.`;
+  } else {
+    loanBalance += sharkPenaltyAmount;
+    loanMsg.textContent = `못 갚아서 부가 이자 ${sharkPenaltyAmount} 코인이 대출금에 붙었습니다.`;
+  }
+  sharkEventActive = false;
+  sharkModal.classList.remove('show');
+  sharkMsg.textContent = '';
+  if(sharkVisitSchedule.length === 0) scheduleNextSharkCycle();
+  setLoanControlsLocked(false);
+  startBtn.disabled = false;
+  updateBalanceUI();
+}
+
+function tryTriggerSharkVisit(){
+  if(gameMode !== 'shark' || sharkVisitSchedule.length === 0 || raceNum < sharkVisitSchedule[0]){
+    return false;
+  }
+  sharkVisitSchedule.shift();
+  if(loanBalance <= 0){
+    if(sharkVisitSchedule.length === 0) scheduleNextSharkCycle();
+    return false;
+  }
+  sharkEventActive = true;
+  sharkDemandAmount = Math.min(loanBalance, randomDebtPortion());
+  sharkPenaltyAmount = randomDebtPortion();
+  sharkDemandEl.textContent = `${sharkDemandAmount} 코인`;
+  sharkPenaltyEl.textContent = `${sharkPenaltyAmount} 코인`;
+  sharkMessage.textContent = `업자가 ${sharkDemandAmount} 코인을 당장 갚으라고 합니다. 못 갚으면 ${sharkPenaltyAmount} 코인이 대출금에 추가됩니다.`;
+  sharkMsg.textContent = balance < sharkDemandAmount
+    ? '보유 코인이 부족해서 요구액을 갚을 수 없습니다.'
+    : '';
+  paySharkBtn.disabled = balance < sharkDemandAmount;
+  sharkModal.classList.add('show');
+  startBtn.disabled = true;
+  setLoanControlsLocked(true);
+  setCommentary('고리대금 업자가 관중석 아래에서 기다리고 있습니다.');
+  return true;
+}
+
+function selectMode(mode){
+  gameMode = mode;
+  document.querySelectorAll('.mode-card').forEach((modeCard) => {
+    const selected = modeCard.dataset.mode === mode;
+    modeCard.classList.toggle('selected', selected);
+    modeCard.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  });
+}
+
+modeOptions.addEventListener('click', (event) => {
+  const card = event.target.closest('.mode-card');
+  if(!card) return;
+  selectMode(card.dataset.mode);
+});
+
+modeStartBtn.addEventListener('click', () => {
+  applyGameMode();
+  modeScreen.classList.add('is-hidden');
+  setCommentary({
+    normal: '일반 모드로 입장했습니다. 깔끔한 한 판 승부입니다.',
+    loan: '은행 대출 모드로 입장했습니다. 레이스마다 2000 코인까지 빌릴 수 있습니다.',
+    shark: '고리대금 모드로 입장했습니다. 업자의 방문 주기는 예측할 수 없습니다.'
+  }[gameMode]);
+  window.dispatchEvent(new Event('resize'));
+});
+
+homeBtn.addEventListener('click', () => {
+  racing = false;
+  sharkEventActive = false;
+  raceState = 'idle';
+  sharkModal.classList.remove('show');
+  resultBanner.classList.remove('show');
+  modeScreen.classList.remove('is-hidden');
+  setBetControlsLocked(false);
+  setLoanControlsLocked(false);
+  setCommentary('홈으로 돌아왔습니다. 모드를 다시 선택하세요.');
+});
+
+paySharkBtn.addEventListener('click', () => resolveSharkVisit(true));
+missSharkBtn.addEventListener('click', () => resolveSharkVisit(false));
+
+betSlider.addEventListener('input', () => {
+  if(racing) return;
+  betAmount = parseInt(betSlider.value, 10);
+  betAmountLabel.textContent = `${betAmount} 코인`;
+  updateBalanceUI();
+});
+
+loanSlider.addEventListener('input', () => {
+  loanAmount = parseInt(loanSlider.value, 10);
+  loanAmountLabel.textContent = `${loanAmount} 코인`;
+});
+
+loanBtn.addEventListener('click', () => {
+  if(racing || gameMode === 'normal' || sharkEventActive) return;
+  const remainingLoanRoom = LOAN_LIMIT - borrowedThisRace;
+  if(remainingLoanRoom <= 0){
+    loanMsg.textContent = '이번 레이스 대출 한도 2000 코인을 모두 사용했습니다.';
+    return;
+  }
+  const borrowAmount = Math.min(loanAmount, remainingLoanRoom);
+  loanBalance += borrowAmount;
+  borrowedThisRace += borrowAmount;
+  balance += borrowAmount;
+  loanMsg.textContent = borrowAmount < loanAmount
+    ? `한도까지 ${borrowAmount} 코인을 대출받았습니다.`
+    : `${borrowAmount} 코인을 대출받았습니다.`;
+  updateBalanceUI();
+});
+
+repayBtn.addEventListener('click', () => {
+  if(racing || gameMode === 'normal' || sharkEventActive) return;
+  if(loanBalance <= 0){
+    loanMsg.textContent = '상환할 대출금이 없습니다.';
+    return;
+  }
+  const repayAmt = Math.min(loanAmount, loanBalance, balance);
+  if(repayAmt <= 0){
+    loanMsg.textContent = '코인이 부족해 상환할 수 없습니다.';
+    return;
+  }
+  balance -= repayAmt;
+  loanBalance -= repayAmt;
+  loanMsg.textContent = `${repayAmt} 코인을 상환했습니다.`;
+  updateBalanceUI();
+});
+
+const TRACK_LEN = 200;
+const LANE_WIDTH = 8.5;
+const container = document.getElementById('scene3d');
+const HEIGHT = 380;
+
+function laneZ(i){ return (i - (LANES-1)/2) * LANE_WIDTH; }
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fc7e8);
+scene.fog = new THREE.Fog(0x8fc7e8, 90, 260);
+
+const camera = new THREE.PerspectiveCamera(52, container.clientWidth/HEIGHT, 0.5, 500);
+camera.position.set(-14, 9, 16);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(container.clientWidth, HEIGHT);
+container.appendChild(renderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = container.clientWidth / HEIGHT;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, HEIGHT);
+});
+
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a3a2a, 0.9));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.05);
+sun.position.set(60, 80, 40);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+const trackWidth = LANE_WIDTH * LANES;
+const dirtMat = new THREE.MeshStandardMaterial({ color:0x8a6a45, roughness:1 });
+const dirt = new THREE.Mesh(new THREE.PlaneGeometry(TRACK_LEN+80, trackWidth), dirtMat);
+dirt.rotation.x = -Math.PI/2;
+dirt.position.set(TRACK_LEN/2 - 10, 0, 0);
+scene.add(dirt);
+
+const laneLineMat = new THREE.MeshBasicMaterial({ color:0xcbb488, transparent:true, opacity:0.5 });
+for(let i=1;i<LANES;i++){
+  const z = laneZ(i) - LANE_WIDTH/2;
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(TRACK_LEN+80, 0.12), laneLineMat);
+  line.rotation.x = -Math.PI/2;
+  line.position.set(TRACK_LEN/2 - 10, 0.02, z);
+  scene.add(line);
+}
+
+const grassMat = new THREE.MeshStandardMaterial({ color:0x3a6b3f, roughness:1 });
+[-1,1].forEach(side=>{
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(TRACK_LEN+120, 34), grassMat);
+  grass.rotation.x = -Math.PI/2;
+  grass.position.set(TRACK_LEN/2 - 10, -0.02, side*(trackWidth/2 + 17));
+  scene.add(grass);
+});
+
+const railMat = new THREE.MeshStandardMaterial({ color:0xede6d6, roughness:0.6 });
+[-1,1].forEach(side=>{
+  const z = side*(trackWidth/2 + 0.6);
+  [0.9, 1.6].forEach(h=>{
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(TRACK_LEN+40, 0.12, 0.12), railMat);
+    rail.position.set(TRACK_LEN/2 - 10, h, z);
+    scene.add(rail);
+  });
+  for(let x=-10; x<=TRACK_LEN+20; x+=8){
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.15,1.7,0.15), railMat);
+    post.position.set(x, 0.85, z);
+    scene.add(post);
+  }
+});
+
+const standColors = [0xb5563c, 0x445c8f, 0x3f8f5f, 0x8a6a45];
+const crowdShirtColors = [0xc1392b,0x2456a6,0x3f8f5f,0xd4a72c,0x7a4fa3,0xd97b29,0xede6d6,0xe0776a];
+const crowdFigures = [];
+for(let i=0;i<10;i++){
+  const c = standColors[i % standColors.length];
+  const h = 3+Math.random()*2;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(6,h,6), new THREE.MeshStandardMaterial({color:c, roughness:1}));
+  const bx = 10 + i*20, bz = -(trackWidth/2+28);
+  box.position.set(bx, h/2, bz);
+  scene.add(box);
+
+  for(let k=0;k<5;k++){
+    const shirt = crowdShirtColors[Math.floor(Math.random()*crowdShirtColors.length)];
+    const person = new THREE.Group();
+    const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.35,0.55,0.3), new THREE.MeshStandardMaterial({color:shirt}));
+    bodyMesh.position.y = 0.28;
+    person.add(bodyMesh);
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8), new THREE.MeshStandardMaterial({color:0xe8b98a}));
+    headMesh.position.y = 0.68;
+    person.add(headMesh);
+    const px = bx + (Math.random()-0.5)*5.2;
+    const pz = bz + (Math.random()-0.5)*5.2;
+    person.position.set(px, h+0.05, pz);
+    person.userData.baseY = h+0.05;
+    person.userData.phase = Math.random()*Math.PI*2;
+    person.userData.speed = 3+Math.random()*2;
+    scene.add(person);
+    crowdFigures.push(person);
+  }
+}
+
+function checkerTexture(){
+  const c = document.createElement('canvas'); c.width=64; c.height=64;
+  const ctx = c.getContext('2d');
+  const s = 8;
+  for(let y=0;y<8;y++) for(let x=0;x<8;x++){
+    ctx.fillStyle = ((x+y)%2===0) ? '#111111' : '#ede6d6';
+    ctx.fillRect(x*s,y*s,s,s);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  return tex;
+}
+const finishMat = new THREE.MeshBasicMaterial({ map: checkerTexture(), side: THREE.DoubleSide });
+const finishPlane = new THREE.Mesh(new THREE.PlaneGeometry(trackWidth, 3), finishMat);
+finishPlane.position.set(TRACK_LEN, 1.5, 0);
+finishPlane.rotation.y = Math.PI/2;
+scene.add(finishPlane);
+
+[-1,1].forEach(side=>{
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,5,8), railMat);
+  pole.position.set(TRACK_LEN, 2.5, side*(trackWidth/2+0.3));
+  scene.add(pole);
+});
+
+function numberSprite(num){
+  const c = document.createElement('canvas'); c.width=64; c.height=64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#d4a72c';
+  ctx.beginPath(); ctx.arc(32,32,28,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#0c1610';
+  ctx.font = 'bold 34px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(num), 32, 34);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest:false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.1,1.1,1);
+  sprite.position.set(0, 3.1, 0);
+  return sprite;
+}
+
+function createHorse(hex, num){
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: hex, roughness:0.7 });
+  const darkMat = new THREE.MeshStandardMaterial({ color:0x2a1c10, roughness:0.8 });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.3,1.1,1.05), bodyMat);
+  body.position.set(0,1.35,0);
+  group.add(body);
+
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.55,1.3,0.55), bodyMat);
+  neck.position.set(1.35,2.05,0);
+  neck.rotation.z = -0.55;
+  group.add(neck);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.85,0.55,0.5), bodyMat);
+  head.position.set(2.05,2.65,0);
+  group.add(head);
+
+  [-0.18,0.18].forEach(ez=>{
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.1,0.3,4), darkMat);
+    ear.position.set(1.95,3.0,ez);
+    group.add(ear);
+  });
+
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.28,1.3,6), darkMat);
+  tail.position.set(-1.35,1.55,0);
+  tail.rotation.z = Math.PI/2 + 0.35;
+  group.add(tail);
+  group.userData.tail = tail;
+
+  const legDefs = [
+    { x:0.85, z:0.42, phase:0 },
+    { x:0.85, z:-0.42, phase:Math.PI },
+    { x:-0.85, z:0.42, phase:Math.PI },
+    { x:-0.85, z:-0.42, phase:0 },
+  ];
+  const legs = [];
+  legDefs.forEach(ld=>{
+    const pivot = new THREE.Group();
+    pivot.position.set(ld.x, 1.35, ld.z);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3,1.3,0.3), darkMat);
+    leg.position.set(0,-0.65,0);
+    pivot.add(leg);
+    pivot.userData.phase = ld.phase;
+    group.add(pivot);
+    legs.push(pivot);
+  });
+  group.userData.legs = legs;
+
+  const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.4,1.15), new THREE.MeshStandardMaterial({color:0xede6d6}));
+  saddle.position.set(-0.1,2.0,0);
+  group.add(saddle);
+
+  group.add(numberSprite(num));
+
+  return group;
+}
+
+const horseMeshes = HORSE_DEFS.map((def,i)=>{
+  const h = createHorse(def.hex, i+1);
+  h.position.set(0, 0, laneZ(i));
+  scene.add(h);
+  return h;
+});
+
+function dustTexture(){
+  const c = document.createElement('canvas'); c.width=32; c.height=32;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(16,16,0,16,16,16);
+  grad.addColorStop(0,'rgba(200,180,140,0.9)');
+  grad.addColorStop(1,'rgba(200,180,140,0)');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,32,32);
+  return new THREE.CanvasTexture(c);
+}
+const dustTex = dustTexture();
+const dustPool = [];
+function spawnDust(x,z){
+  if(dustPool.length > 90) return;
+  const mat = new THREE.SpriteMaterial({ map:dustTex, transparent:true, opacity:0.55, depthWrite:false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.6,0.6,1);
+  sprite.position.set(x - 1.4 + (Math.random()-0.5)*0.6, 0.2, z + (Math.random()-0.5)*1.2);
+  scene.add(sprite);
+  dustPool.push({ sprite, life:0.5, maxLife:0.5, vel:new THREE.Vector3(-1.2 - Math.random(),0.6+Math.random(),(Math.random()-0.5)*0.6) });
+}
+function updateDust(dt){
+  for(let i=dustPool.length-1;i>=0;i--){
+    const d = dustPool[i];
+    d.life -= dt;
+    if(d.life<=0){ scene.remove(d.sprite); dustPool.splice(i,1); continue; }
+    d.sprite.position.addScaledVector(d.vel, dt);
+    d.vel.y -= 2.2*dt;
+    const t = d.life/d.maxLife;
+    d.sprite.material.opacity = t*0.55;
+    d.sprite.scale.setScalar(0.6 + (1-t)*0.9);
+  }
+}
+
+const confettiPool = [];
+const confettiColors = [0xd4a72c,0xc1392b,0x2456a6,0x3f8f5f,0x7a4fa3,0xede6d6];
+function spawnConfetti(x,z){
+  for(let i=0;i<28;i++){
+    const mat = new THREE.MeshStandardMaterial({ color: confettiColors[i%confettiColors.length] });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.22,0.22), mat);
+    mesh.position.set(x + (Math.random()-0.5)*1.5, 3+Math.random()*1.5, z + (Math.random()-0.5)*1.5);
+    scene.add(mesh);
+    confettiPool.push({
+      mesh, life:1.6,
+      vel:new THREE.Vector3((Math.random()-0.5)*6, 5+Math.random()*4, (Math.random()-0.5)*6),
+      rot:new THREE.Vector3(Math.random()*6,Math.random()*6,Math.random()*6)
+    });
+  }
+}
+function updateConfetti(dt){
+  for(let i=confettiPool.length-1;i>=0;i--){
+    const c = confettiPool[i];
+    c.life -= dt;
+    if(c.life<=0){ scene.remove(c.mesh); confettiPool.splice(i,1); continue; }
+    c.vel.y -= 9*dt;
+    c.mesh.position.addScaledVector(c.vel, dt);
+    c.mesh.rotation.x += c.rot.x*dt;
+    c.mesh.rotation.y += c.rot.y*dt;
+  }
+}
+
+let raceState = 'idle';
+let positions = HORSE_DEFS.map(()=>0);
+let strengths = HORSE_DEFS.map(()=>0);
+let lastSpeed = HORSE_DEFS.map(()=>0);
+let surgeMult = HORSE_DEFS.map(()=>1);
+let surgeTime = HORSE_DEFS.map(()=>0);
+let dustAcc = HORSE_DEFS.map(()=>0);
+let winnerIdx = null;
+let currentLeader = null;
+let finishTimer = 0;
+let surgeCooldown = 1.0;
+let commentCooldown = 0;
+let strechAnnounced = false;
+let closeAnnounced = false;
+
+const RACE_SPEED_SCALE = 0.42;
+const clock = new THREE.Clock();
+
+function worldX(pct){ return Math.min(pct,112)/100 * TRACK_LEN; }
+
+function setCommentary(text){
+  commentaryBar.textContent = text;
+}
+
+function renderLeaderboard(){
+  const order = positions.map((p,i)=>i).sort((a,b)=>positions[b]-positions[a]);
+  lbRows.innerHTML = order.map((idx,rank)=>{
+    const def = HORSE_DEFS[idx];
+    const meClass = idx===selectedHorse ? ' me' : '';
+    return `<div class="lb-row${meClass}"><span class="lb-rank">${rank+1}</span><span class="lb-dot" style="background:#${def.hex.toString(16).padStart(6,'0')}"></span>${def.name}</div>`;
+  }).join('');
+}
+
+function resetRaceVars(){
+  positions = HORSE_DEFS.map(()=>0);
+  strengths = HORSE_DEFS.map(()=> 0.6 + Math.random()*1.2);
+  lastSpeed = HORSE_DEFS.map(()=>0.05);
+  surgeMult = HORSE_DEFS.map(()=>1);
+  surgeTime = HORSE_DEFS.map(()=>0);
+  dustAcc = HORSE_DEFS.map(()=>0);
+  winnerIdx = null;
+  currentLeader = null;
+  finishTimer = 0;
+  surgeCooldown = 1.0 + Math.random();
+  commentCooldown = 0;
+  strechAnnounced = false;
+  closeAnnounced = false;
+  renderLeaderboard();
+}
+
+function newRaceSetup(){
+  resetRaceVars();
+  renderHorseCards();
+  selectedHorse = null;
+  borrowedThisRace = 0;
+  resultBanner.classList.remove('show');
+  setBetControlsLocked(false);
+  updateBalanceUI();
+  startBtn.textContent = '경주 시작 🏁';
+  startBtn.onclick = runRace;
+  startBtn.disabled = false;
+  raceState = 'idle';
+  setCommentary('말을 선택하고 베팅한 뒤 경주를 시작하세요.');
+}
+
+function startRaceVisuals(){
+  resetRaceVars();
+  raceState = 'racing';
+  setCommentary('출발! 게이트가 열렸습니다 🏁');
+}
+
+function updateRacePhysics(dt){
+  const step = dt*60*RACE_SPEED_SCALE;
+  commentCooldown -= dt;
+  surgeCooldown -= dt;
+
+  for(let i=0;i<LANES;i++){
+    if(surgeTime[i] > 0){
+      surgeTime[i] -= dt;
+      if(surgeTime[i] <= 0) surgeMult[i] = 1;
+    }
+  }
+
+  if(raceState === 'racing' && surgeCooldown <= 0){
+    const candidate = Math.floor(Math.random()*LANES);
+    if(surgeMult[candidate] === 1 && positions[candidate] < 95){
+      surgeMult[candidate] = 1.7;
+      surgeTime[candidate] = 0.55;
+      surgeCooldown = 0.9 + Math.random()*1.1;
+      if(commentCooldown <= 0){
+        setCommentary(`${HORSE_DEFS[candidate].name} 선수, 스퍼트를 올립니다!`);
+        commentCooldown = 1.3;
+      }
+    } else {
+      surgeCooldown = 0.3;
+    }
+  }
+
+  for(let i=0;i<LANES;i++){
+    const base = 0.35 + strengths[i]*0.55;
+    const noise = (Math.random()-0.4)*0.9;
+    const inc = Math.max(0.05, base+noise) * surgeMult[i] * step;
+    if(raceState === 'racing' || raceState === 'finishing'){
+      positions[i] += inc;
+    }
+    lastSpeed[i] = inc;
+    dustAcc[i] += inc;
+    if(dustAcc[i] > 0.7){
+      dustAcc[i] = 0;
+      const x = worldX(positions[i]);
+      spawnDust(x, laneZ(i));
+    }
+  }
+
+  const leader = positions.indexOf(Math.max(...positions));
+  if(leader !== currentLeader){
+    if(currentLeader !== null && commentCooldown <= 0 && raceState==='racing'){
+      setCommentary(`${HORSE_DEFS[leader].name} 선수가 앞으로 치고 나갑니다!`);
+      commentCooldown = 1.3;
+    }
+    currentLeader = leader;
+  }
+
+  if(!strechAnnounced && positions[leader] >= 70 && raceState==='racing'){
+    strechAnnounced = true;
+    if(commentCooldown <= 0){ setCommentary('결승선이 눈앞입니다! 막판 스퍼트!'); commentCooldown = 1.3; }
+  }
+
+  const sorted = [...positions].sort((a,b)=>b-a);
+  if(!closeAnnounced && positions[leader] >= 85 && (sorted[0]-sorted[1]) < 4 && raceState==='racing'){
+    closeAnnounced = true;
+    setCommentary('초박빙! 사진 판정이 필요할 수도 있습니다!');
+    commentCooldown = 1.3;
+  }
+
+  renderLeaderboard();
+
+  if(raceState === 'racing' && winnerIdx === null && positions[leader] >= 100){
+    winnerIdx = leader;
+    raceState = 'finishing';
+    finishTimer = 0;
+    setCommentary(`${HORSE_DEFS[winnerIdx].name} 선수, 결승선을 통과합니다!`);
+  }
+
+  if(raceState === 'finishing'){
+    finishTimer += dt;
+    if(finishTimer > 0.8){
+      raceState = 'celebrating';
+      finishTimer = 0;
+      const x = worldX(positions[winnerIdx]);
+      spawnConfetti(x, laneZ(winnerIdx));
+      HORSE_DEFS.forEach((_,i)=> surgeMult[i]=1);
+    }
+  }
+
+  if(raceState === 'celebrating'){
+    finishTimer += dt;
+    if(finishTimer > 1.4){
+      raceState = 'done';
+      finishRace(winnerIdx);
+    }
+  }
+}
+
+function updateHorseVisuals(dt, elapsed){
+  horseMeshes.forEach((h,i)=>{
+    const x = worldX(positions[i]);
+    h.position.x = x;
+    const speedFactor = Math.min(3.5, 1 + lastSpeed[i]*3);
+    h.position.y = Math.abs(Math.sin(elapsed*speedFactor*4)) * 0.12;
+    h.userData.legs.forEach(pivot=>{
+      pivot.rotation.x = Math.sin(elapsed*speedFactor*8 + pivot.userData.phase) * 0.55 * Math.min(1,speedFactor);
+    });
+    h.userData.tail.rotation.x = Math.sin(elapsed*4 + i) * 0.15;
+  });
+}
+
+const camPos = new THREE.Vector3(-14,9,16);
+const camTarget = new THREE.Vector3(6,1.6,0);
+function updateCamera(dt){
+  let dPos, dTarget;
+  if(raceState === 'idle' || raceState === 'done'){
+    dPos = new THREE.Vector3(-14,8.5,16);
+    dTarget = new THREE.Vector3(10,1.5,0);
+  } else if(raceState === 'celebrating'){
+    const wx = worldX(positions[winnerIdx]);
+    const wz = laneZ(winnerIdx);
+    dPos = new THREE.Vector3(wx-6, 3.2, wz+7);
+    dTarget = new THREE.Vector3(wx, 1.8, wz);
+  } else {
+    const idx = currentLeader !== null ? currentLeader : 0;
+    const lx = worldX(positions[idx]);
+    const progress = positions[idx]/100;
+    dPos = new THREE.Vector3(lx-15, 8 - progress*1.5, 13 - progress*3);
+    dTarget = new THREE.Vector3(lx+7, 1.6, 0);
+  }
+  const t = 1 - Math.pow(0.001, dt);
+  camPos.lerp(dPos, t);
+  camTarget.lerp(dTarget, t);
+  camera.position.copy(camPos);
+  camera.lookAt(camTarget);
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const elapsed = clock.getElapsedTime();
+  updateRacePhysics(dt);
+  updateHorseVisuals(dt, elapsed);
+  updateCamera(dt);
+  updateDust(dt);
+  updateConfetti(dt);
+  renderer.render(scene, camera);
+}
+animate();
+
+function runRace(){
+  if(sharkEventActive){
+    statusMsg.textContent = '고리대금 업자 문제를 먼저 해결해야 합니다.';
+    return;
+  }
+  if(selectedHorse === null){
+    statusMsg.textContent = '먼저 베팅할 말을 선택해주세요!';
+    return;
+  }
+  if(betAmount > balance){
+    statusMsg.textContent = '코인이 부족합니다.';
+    return;
+  }
+  racing = true;
+  balance -= betAmount;
+  if(gameMode !== 'normal' && loanBalance > 0){
+    loanBalance = Math.ceil(loanBalance * (1 + LOAN_INTEREST_RATE));
+    loanMsg.textContent = `대출 이자가 붙어 대출금이 ${loanBalance} 코인이 되었습니다.`;
+  }
+  updateBalanceUI();
+  setBetControlsLocked(true);
+  startBtn.disabled = true;
+  setLoanControlsLocked(true);
+  document.querySelectorAll('.horse-card').forEach(c => c.style.pointerEvents = 'none');
+  statusMsg.textContent = '경주 중... 🏇';
+  resultBanner.classList.remove('show');
+  startRaceVisuals();
+}
+
+function finishRace(winner){
+  racing = false;
+  const won = winner === selectedHorse;
+  let payout = 0;
+  if(won){
+    payout = betAmount * PAYOUT_MULTIPLIER;
+    balance += payout;
+  }
+  updateBalanceUI();
+
+  resultBanner.classList.add('show');
+  if(won){
+    resultText.textContent = `🎉 ${HORSE_DEFS[winner].name} 우승! ${payout} 코인 획득!`;
+    resultText.style.color = '#f0c85a';
+  } else {
+    resultText.textContent = `${HORSE_DEFS[winner].name} 우승 — 베팅에 실패했습니다.`;
+    resultText.style.color = '#e0776a';
+  }
+  resultDetail.textContent = won
+    ? `적중 배율 x${PAYOUT_MULTIPLIER} · 내 선택: ${HORSE_DEFS[selectedHorse].name}`
+    : `내 선택: ${HORSE_DEFS[selectedHorse].name}`;
+
+  statusMsg.textContent = balance > 0
+    ? '다음 레이스를 준비하세요.'
+    : '코인이 모두 소진되었습니다. 새로고침하면 다시 시작할 수 있어요.';
+  setCommentary(`레이스 종료 — ${HORSE_DEFS[winner].name} 우승!`);
+
+  startBtn.textContent = '다음 레이스 ▶';
+  startBtn.disabled = false;
+  setBetControlsLocked(false);
+  setLoanControlsLocked(false);
+  tryTriggerSharkVisit();
+  startBtn.onclick = () => {
+    raceNum += 1;
+    startBtn.textContent = '경주 시작 🏁';
+    startBtn.onclick = runRace;
+    newRaceSetup();
+  };
+}
+
+startBtn.onclick = runRace;
+newRaceSetup();
+</script>
+</body>
+</html>
